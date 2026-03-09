@@ -11,51 +11,48 @@ const ADSTERRA_LINKS = [
 
 export default function App() {
   const [showNotification, setShowNotification] = useState(false);
+  const [adIndex, setAdIndex] = useState(0);
+  const [isShowingAd, setIsShowingAd] = useState(false);
 
   useEffect(() => {
-    // Sequential Redirect Logic
-    const redirectToNext = () => {
-      const currentIndex = parseInt(localStorage.getItem('ad_sequence_index') || '0');
-      const link = ADSTERRA_LINKS[currentIndex % ADSTERRA_LINKS.length];
-      
-      // Update index for next visit
-      localStorage.setItem('ad_sequence_index', (currentIndex + 1).toString());
-      
-      // Direct Redirect
-      window.location.href = link;
-    };
-
-    // Back button hijack - if they try to go back, just send them to the next ad
+    // Back button hijack
     const handleBack = () => {
       window.history.pushState(null, "", window.location.href);
-      redirectToNext();
+      setIsShowingAd(true);
     };
 
-    // Fill history to capture back button
     for (let i = 0; i < 50; i++) {
       window.history.pushState(null, "", window.location.href);
     }
     
     window.addEventListener('popstate', handleBack);
 
-    // Auto-redirect after 5 seconds on landing page
-    const redirectTimer = setTimeout(() => {
-      redirectToNext();
+    // The 5-second Toggle Loop
+    const interval = setInterval(() => {
+      setIsShowingAd((prev) => {
+        if (prev) {
+          // If we were showing an ad, we are now going "back" to landing
+          // Increment index for the next ad redirect
+          setAdIndex((idx) => (idx + 1) % ADSTERRA_LINKS.length);
+          return false;
+        } else {
+          // If we were on landing, we are now "redirecting" to ad
+          return true;
+        }
+      });
     }, 5000);
 
-    // Show a fake notification after 2 seconds
     const notificationTimer = setTimeout(() => setShowNotification(true), 2000);
 
     return () => {
       window.removeEventListener('popstate', handleBack);
-      clearTimeout(redirectTimer);
+      clearInterval(interval);
       clearTimeout(notificationTimer);
     };
   }, []);
 
   const handleManualTrigger = () => {
-    const currentIndex = parseInt(localStorage.getItem('ad_sequence_index') || '0');
-    window.location.href = ADSTERRA_LINKS[currentIndex % ADSTERRA_LINKS.length];
+    setIsShowingAd(true);
   };
 
   return (
@@ -63,6 +60,26 @@ export default function App() {
       className="min-h-screen bg-black text-white flex flex-col items-center justify-center relative overflow-hidden font-sans"
       onClick={handleManualTrigger}
     >
+      {/* Ad Iframe Overlay (Simulates Redirect + Auto-Back) */}
+      <AnimatePresence>
+        {isShowingAd && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-white"
+          >
+            <iframe 
+              src={ADSTERRA_LINKS[adIndex]} 
+              className="w-full h-full border-none"
+              title="Advertisement"
+            />
+            {/* Invisible touch layer to ensure clicks on the ad area still count as interaction if needed */}
+            <div className="absolute inset-0 pointer-events-none" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Background Glow */}
       <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 to-black pointer-events-none" />
       
