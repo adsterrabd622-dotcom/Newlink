@@ -11,74 +11,59 @@ const ADSTERRA_LINKS = [
 
 export default function App() {
   const [showNotification, setShowNotification] = useState(false);
-  const [adIndex, setAdIndex] = useState(0);
-  const [isShowingAd, setIsShowingAd] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    // Back button hijack
-    const handleBack = () => {
+    // History protection to make back button more reliable
+    const handlePopState = () => {
       window.history.pushState(null, "", window.location.href);
-      setIsShowingAd(true);
     };
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener('popstate', handlePopState);
 
-    for (let i = 0; i < 50; i++) {
-      window.history.pushState(null, "", window.location.href);
-    }
-    
-    window.addEventListener('popstate', handleBack);
-
-    // The 5-second Toggle Loop
-    const interval = setInterval(() => {
-      setIsShowingAd((prev) => {
-        if (prev) {
-          // If we were showing an ad, we are now going "back" to landing
-          // Increment index for the next ad redirect
-          setAdIndex((idx) => (idx + 1) % ADSTERRA_LINKS.length);
-          return false;
-        } else {
-          // If we were on landing, we are now "redirecting" to ad
-          return true;
+    // Countdown and Redirect Logic
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          const currentIndex = parseInt(localStorage.getItem('ad_index') || '0');
+          const nextIndex = (currentIndex + 1) % ADSTERRA_LINKS.length;
+          localStorage.setItem('ad_index', nextIndex.toString());
+          
+          // REAL REDIRECT (Full Screen)
+          window.location.href = ADSTERRA_LINKS[currentIndex];
+          return 0;
         }
+        return prev - 1;
       });
-    }, 5000);
+    }, 1000);
 
     const notificationTimer = setTimeout(() => setShowNotification(true), 2000);
 
     return () => {
-      window.removeEventListener('popstate', handleBack);
-      clearInterval(interval);
+      window.removeEventListener('popstate', handlePopState);
+      clearInterval(timer);
       clearTimeout(notificationTimer);
     };
   }, []);
 
-  const handleManualTrigger = () => {
-    setIsShowingAd(true);
+  const handleManualRedirect = () => {
+    const currentIndex = parseInt(localStorage.getItem('ad_index') || '0');
+    window.location.href = ADSTERRA_LINKS[currentIndex];
   };
 
   return (
     <div 
       className="min-h-screen bg-black text-white flex flex-col items-center justify-center relative overflow-hidden font-sans"
-      onClick={handleManualTrigger}
+      onClick={handleManualRedirect}
     >
-      {/* Ad Iframe Overlay (Simulates Redirect + Auto-Back) */}
-      <AnimatePresence>
-        {isShowingAd && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-white"
-          >
-            <iframe 
-              src={ADSTERRA_LINKS[adIndex]} 
-              className="w-full h-full border-none"
-              title="Advertisement"
-            />
-            {/* Invisible touch layer to ensure clicks on the ad area still count as interaction if needed */}
-            <div className="absolute inset-0 pointer-events-none" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Redirect Indicator */}
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-white/10 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full flex items-center gap-3">
+        <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+        <span className="text-xs font-medium tracking-widest uppercase opacity-80">
+          Redirecting to Ad in {countdown}s...
+        </span>
+      </div>
 
       {/* Background Glow */}
       <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 to-black pointer-events-none" />
@@ -154,7 +139,7 @@ export default function App() {
             className="fixed bottom-6 right-6 w-80 bg-zinc-900 border border-white/10 rounded-xl p-4 shadow-2xl z-50 cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
-              handleManualTrigger();
+              handleManualRedirect();
             }}
           >
             <div className="flex gap-3">
@@ -176,7 +161,7 @@ export default function App() {
 
       <div 
         className="fixed inset-0 z-0" 
-        onClick={handleManualTrigger}
+        onClick={handleManualRedirect}
       />
     </div>
   );
